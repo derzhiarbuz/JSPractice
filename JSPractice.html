@@ -1,0 +1,99 @@
+<html>
+	<head>
+		<title></title>
+		<script>
+			let token = 'BCSKMCXRVDGHMJUP67CL'
+
+			function pad(num, size) {
+				var s = num+"";
+				while (s.length < size) s = "0" + s;
+				return s;
+			}
+
+			function filter(str) {
+				if(!str) return false;
+				return str.match(/Python/i) || str.match(/SaltStack/i) || str.match(/AWS/) || str.match(/Cloud/i) || str.match(/Docker/i);
+			}
+
+			let request = new XMLHttpRequest();
+			let entries = []
+			let page = 1
+			let npages = 0
+			let total_pages = 0
+			let used_ids = new Set();
+
+			request.open('GET','https://www.eventbriteapi.com/v3/events/search/?token='+token+'&location.address=seattle&start_date.range_start=2019-07-12T00:00:01Z&start_date.range_end=2019-07-31T00:00:01Z&page='+page.toString(),true);
+			request.addEventListener('readystatechange', function() {
+			  if ((request.readyState==4) && (request.status==200)) {
+				console.log(request);
+				let body = document.getElementsByTagName('body')[0];
+				let obj = JSON.parse(request.responseText);
+				total_pages = obj.pagination.page_count;
+				for(let entry of obj.events) {
+					if(!used_ids.has(entry.id) && (filter(entry.name.text) || filter(entry.description.text))) { //use set container to ensure no ids repeated
+						entries.push(entry);
+						used_ids.add(entry.id)
+					}
+				}
+				npages++;
+				body.innerHTML = '<h1>Seattle 12.07.2019 to 31.07.2019</h1></br>' + npages + ' from ' + total_pages + ' unfiltered pages loaded. Be patient. Ples.';
+				let requests = []
+				while(page < total_pages) {
+					page++;
+					let request2 = new XMLHttpRequest();
+					request2.open('GET','https://www.eventbriteapi.com/v3/events/search/?token='+token+'&location.address=seattle&start_date.range_start=2019-07-12T00:00:01Z&start_date.range_end=2019-07-31T00:00:01Z&page='+page.toString(),true);
+					request2.addEventListener('readystatechange', function() {
+						if ((request2.readyState==4) && (request2.status==200)) {
+							console.log(request2);
+							console.log('Wee!');
+							let obj2 = JSON.parse(request2.responseText);
+							for(let entry of obj2.events) {
+								if(!used_ids.has(entry.id) && (filter(entry.name.text) || filter(entry.description.text))) { //use set container to ensure no ids repeated
+									entries.push(entry);
+									used_ids.add(entry.id)
+								}
+							}
+							npages++;
+							body.innerHTML = '<h1>Seattle 12.07.2019 to 31.07.2019</h1></br>' + npages + ' from ' + total_pages + ' unfiltered pages loaded. Be patient. Ples.';
+							if(npages == total_pages) {
+								console.log('Download completed!');
+								console.log(entries.length);
+								let body = document.getElementsByTagName('body')[0];
+								let btext = '<h1>Seattle 12.07.2019 to 31.07.2019</h1></br>Keywords: SaltStack, AWS, Cloud, Docker, Python</br>';
+								entries.sort(function(a,b) {
+									if(a.start.utc > b.start.utc) return 1;
+									if(a.start.utc < b.start.utc) return -1;
+									return 0;
+								});
+								let i=1
+								let months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+								let daweek = ['sun', 'mon', 'tew', 'wed', 'thu', 'fri', 'sat']
+								let lastDate = new Date(0,0,0,0,0,0,0)
+								for(let entry of entries) {
+									let date = new Date(entry.start.utc)
+									if(date.getDate() != lastDate.getDate() ||
+									date.getMonth() != lastDate.getMonth() ||
+									date.getFullYear() != lastDate.getFullYear()) {
+										btext = btext + "<br/><h2>" + date.getDate().toString() + " " + months[date.getMonth()]+ " " + date.getFullYear().toString() + ", " + daweek[date.getDay()] + '</h2>';
+										lastDate = date;
+									}
+									btext = btext + pad(date.getHours(),2) + ':' + pad(date.getMinutes(),2) + ' <b>' + entry.name.text + '</b></br>' + entry.description.text + '</br><a href="' + entry.url + '">' + entry.name.html + '</a><br/></br>';
+									i++;
+								}
+								body.innerHTML = btext;
+							}
+						}
+					});
+					request2.send();
+				}
+			  }
+			}); 
+			request.send();
+		</script>
+	</head>
+
+	<body>
+		<h1>Seattle 12.07.2019 to 31.07.2019</h1></br>0 unfiltered pages loaded. Be patient. Ples.
+	</body>
+
+</html>
